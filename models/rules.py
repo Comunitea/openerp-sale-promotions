@@ -82,13 +82,13 @@ class PromotionsRules(orm.Model):
     _description = __doc__
     _order = 'sequence'
 
-    def count_coupon_use(self, cursor, user, ids,
+    def count_coupon_use(self, cr, uid, ids,
                           name, arg, context=None):
         '''
         This function count the number of sale orders(not in cancelled state)
         that are linked to a particular coupon.
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param ids: ID of Current record.
         @param name: Name of the field which calls this function.
         @param arg: Any argument(here None).
@@ -98,11 +98,11 @@ class PromotionsRules(orm.Model):
         '''
         sales_obj = self.pool.get('sale.order')
         res = {}
-        for promotion_rule in self.browse(cursor, user, ids, context):
+        for promotion_rule in self.browse(cr, uid, ids, context):
             if promotion_rule.coupon_code:
                 #If there is uses per coupon defined check if its overused
                 if promotion_rule.uses_per_coupon > -1:
-                    matching_ids = sales_obj.search(cursor, user,
+                    matching_ids = sales_obj.search(cr, uid,
                             [
                             ('coupon_code', '=', promotion_rule.coupon_code),
                             ('state', '<>', 'cancel')
@@ -175,14 +175,14 @@ class PromotionsRules(orm.Model):
                 return str_date
 
 
-    def check_primary_conditions(self, cursor, user,
+    def check_primary_conditions(self, cr, uid,
                                   promotion_rule, order, context):
         """
         Checks the conditions for
             Coupon Code
             Validity Date
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param promotion_rule: Browse record sent by calling func.
         @param order: Browse record sent by calling func.
         @param context: Context(no direct use).
@@ -206,13 +206,13 @@ class PromotionsRules(orm.Model):
                 raise Exception("Coupon codes do not match")
             # Calling count_coupon_use to check whether no. of
             # uses is greater than allowed uses.
-            count = self.count_coupon_use(cursor, user, [promotion_rule.id],
+            count = self.count_coupon_use(cr, uid, [promotion_rule.id],
                                            True, None, context).values()[0]
             if count > promotion_rule.uses_per_coupon:
                 raise Exception("Coupon is overused")
             #If a limitation exists on the usage per partner
             if promotion_rule.uses_per_partner > -1:
-                matching_ids = sales_obj.search(cursor, user,
+                matching_ids = sales_obj.search(cr, uid,
                          [
                           ('partner_id', '=', order.partner_id.id),
                           ('coupon_code', '=', promotion_rule.coupon_code),
@@ -233,11 +233,11 @@ class PromotionsRules(orm.Model):
         #All tests have succeeded
         return True
 
-    def evaluate(self, cursor, user, promotion_rule, order, context=None):
+    def evaluate(self, cr, uid, promotion_rule, order, context=None):
         """
         Evaluates if a promotion is valid
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param promotion_rule: Browse Record
         @param order: Browse Record
         @param context: Context(no direct use).
@@ -247,7 +247,7 @@ class PromotionsRules(orm.Model):
         expression_obj = self.pool.get('promos.rules.conditions.exps')
         try:
             self.check_primary_conditions(
-                                           cursor, user,
+                                           cr, uid,
                                            promotion_rule, order,
                                            context)
         except Exception, e:
@@ -263,7 +263,7 @@ class PromotionsRules(orm.Model):
         for expression in promotion_rule.expressions:
             result = 'Execution Failed'
             try:
-                result = expression_obj.evaluate(cursor, user,
+                result = expression_obj.evaluate(cr, uid,
                                              expression, order, context)
                 #For and logic, any False is completely false
                 if (not (result == expected_result)) and (logic == 'and'):
@@ -295,12 +295,12 @@ class PromotionsRules(orm.Model):
             #if control comes here for OR logic, none were satisfied
             return False
 
-    def execute_actions(self, cursor, user, promotion_rule,
+    def execute_actions(self, cr, uid, promotion_rule,
                             order_id, context):
         """
         Executes the actions associated with this rule
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param promotion_rule: Browse Record
         @param order_id: ID of sale order
         @param context: Context(no direct use).
@@ -313,40 +313,40 @@ class PromotionsRules(orm.Model):
                                                promotion_rule.id,
                                                order_id
                                                ))
-        order = self.pool.get('sale.order').browse(cursor, user,
+        order = self.pool.get('sale.order').browse(cr, uid,
                                                    order_id, context)
         for action in promotion_rule.actions:
             try:
-                action_obj.execute(cursor, user, action.id,
+                action_obj.execute(cr, uid, action.id,
                                    order, context=None)
             except Exception, error:
                 raise error
         return True
 
 
-    def apply_promotions(self, cursor, user, order_id, context=None):
+    def apply_promotions(self, cr, uid, order_id, context=None):
         """
         Applies promotions
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param order_id: ID of sale order
         @param context: Context(no direct use).
         """
-        order = self.pool.get('sale.order').browse(cursor, user,
+        order = self.pool.get('sale.order').browse(cr, uid,
                                                    order_id, context=context)
-        active_promos = self.search(cursor, user,
+        active_promos = self.search(cr, uid,
                                     [('active', '=', True)],
                                     context=context)
 
-        for promotion_rule in self.browse(cursor, user,
+        for promotion_rule in self.browse(cr, uid,
                                           active_promos, context):
-            result = self.evaluate(cursor, user,
+            result = self.evaluate(cr, uid,
                                    promotion_rule, order,
                                    context)
             #If evaluates to true
             if result:
                 try:
-                    self.execute_actions(cursor, user,
+                    self.execute_actions(cr, uid,
                                      promotion_rule, order_id,
                                      context)
                 except Exception, e:
@@ -367,12 +367,12 @@ class PromotionsRulesConditionsExprs(orm.Model):
     _order = "sequence"
     _rec_name = 'serialised_expr'
 
-    def on_change(self, cursor, user, ids=None,
+    def on_change(self, cr, uid, ids=None,
                    attribute=None, value=None, context=None):
         """
         Set the value field to the format if nothing is there
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param ids: ID of current record.
         @param attribute: attribute sent by caller.
         @param value: Value sent by caller.
@@ -450,11 +450,11 @@ class PromotionsRulesConditionsExprs(orm.Model):
         'stop_further': lambda * a: '1'
     }
 
-    def validate(self, cursor, user, vals, context=None):
+    def validate(self, cr, uid, vals, context=None):
         """
         Checks the validity
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param vals: Values of current record.
         @param context: Context(no direct use).
         """
@@ -576,12 +576,12 @@ class PromotionsRulesConditionsExprs(orm.Model):
                                     comparator,
                                     value)
 
-    def evaluate(self, cursor, user,
+    def evaluate(self, cr, uid,
                  expression, order, context=None):
         """
         Evaluates the expression in given environment
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param expression: Browse record of expression
         @param order: Browse Record of sale order
         @param context: Context(no direct use).
@@ -620,29 +620,29 @@ class PromotionsRulesConditionsExprs(orm.Model):
                                                     ) + line.th_weight
         return eval(expression.serialised_expr)
 
-    def create(self, cursor, user, vals, context=None):
+    def create(self, cr, uid, vals, context=None):
         """
         Serialise before save
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param vals: Values of current record.
         @param context: Context(no direct use).
         """
         try:
-            self.validate(cursor, user, vals, context)
+            self.validate(cr, uid, vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
         vals['serialised_expr'] = self.serialise(vals['attribute'],
                                                  vals['comparator'],
                                                  vals['value'])
-        super(PromotionsRulesConditionsExprs, self).create(cursor, user,
+        super(PromotionsRulesConditionsExprs, self).create(cr, uid,
                                                            vals, context)
 
-    def write(self, cursor, user, ids, vals, context):
+    def write(self, cr, uid, ids, vals, context):
         """
         Serialise before Write
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param ids: ID of current record.
         @param vals: Values of current record.
         @param context: Context(no direct use).
@@ -651,12 +651,12 @@ class PromotionsRulesConditionsExprs(orm.Model):
         if type(ids) in [list, tuple] and ids:
             ids = ids[0]
         try:
-            old_vals = self.read(cursor, user, ids,
+            old_vals = self.read(cr, uid, ids,
                                  ['attribute', 'comparator', 'value'],
                                  context)
             old_vals.update(vals)
             old_vals.has_key('id') and old_vals.pop('id')
-            self.validate(cursor, user, old_vals, context)
+            self.validate(cr, uid, old_vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
         #only value may have changed and client gives only value
@@ -664,7 +664,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
         vals['serialised_expr'] = self.serialise(vals['attribute'],
                                                  vals['comparator'],
                                                  vals['value'])
-        super(PromotionsRulesConditionsExprs, self).write(cursor, user, ids,
+        super(PromotionsRulesConditionsExprs, self).write(cr, uid, ids,
                                                            vals, context)
 
 
@@ -674,13 +674,13 @@ class PromotionsRulesActions(orm.Model):
     _description = __doc__
     _rec_name = 'action_type'
 
-    def on_change(self, cursor, user, ids=None,
+    def on_change(self, cr, uid, ids=None,
                    action_type=None, product_code=None,
                    arguments=None, context=None):
         """
         Sets the arguments as templates according to action_type
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param ids: ID of current record
         @param action_type: type of action to be taken
         @product_code: Product on which action will be taken.
@@ -740,44 +740,47 @@ class PromotionsRulesActions(orm.Model):
         'promotion':fields.many2one('promos.rules', 'Promotion'),
     }
 
-    '''def clear_existing_promotion_lines(self, cursor, user,
+    '''def clear_existing_promotion_lines(self, cr, uid,
                                         order, context=None):
         """
         Deletes existing promotion lines before applying
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param order: Sale order
         @param context: Context(no direct use).
         """
         order_line_obj = self.pool.get('sale.order.line')
         #Delete all promotion lines
-        order_line_ids = order_line_obj.search(cursor, user,
+        order_line_ids = order_line_obj.search(cr, uid,
                                             [
                                              ('order_id', '=', order.id),
                                              ('promotion_line', '=', True),
                                             ], context=context
                                             )
         if order_line_ids:
-            order_line_obj.unlink(cursor, user, order_line_ids, context)
+            order_line_obj.unlink(cr, uid, order_line_ids, context)
         #Clear discount column
-        order_line_ids = order_line_obj.search(cursor, user,
+        order_line_ids = order_line_obj.search(cr, uid,
                                             [
                                              ('order_id', '=', order.id),
                                             ], context=context
                                             )
         if order_line_ids:
-            order_line_obj.write(cursor, user,
+            order_line_obj.write(cr, uid,
                                  order_line_ids,
                                  {'discount':0.00},
                                  context=context)
         return True'''
 
-    def action_prod_disc_perc(self, cursor, user,
+    def create_line(self, cr, uid, vals, context):
+        return self.pool.get('sale.order.line').create(cr, uid, vals, context)
+
+    def action_prod_disc_perc(self, cr, uid,
                                action, order, context=None):
         """
         Action for 'Discount % on Product'
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
@@ -785,8 +788,8 @@ class PromotionsRulesActions(orm.Model):
         order_line_obj = self.pool.get('sale.order.line')
         for order_line in order.order_line:
             if order_line.product_id.code == eval(action.product_code):
-                return order_line_obj.write(cursor,
-                                     user,
+                return order_line_obj.write(cr,
+                                     uid,
                                      order_line.id,
                                      {
                                       'discount':eval(action.arguments),
@@ -794,12 +797,12 @@ class PromotionsRulesActions(orm.Model):
                                      context
                                      )
 
-    def action_prod_disc_fix(self, cursor, user,
+    def action_prod_disc_fix(self, cr, uid,
                               action, order, context=None):
         """
         Action for 'Fixed amount on Product'
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
@@ -808,14 +811,14 @@ class PromotionsRulesActions(orm.Model):
         product_obj = self.pool.get('product.product')
         line_name = '%s on %s' % (action.promotion.name,
                                      eval(action.product_code))
-        product_id = product_obj.search(cursor, user,
+        product_id = product_obj.search(cr, uid,
                        [('default_code', '=', eval(action.product_code))],
                        context=context)
         if not product_id:
             raise Exception("No product with the product code")
         if len(product_id) > 1:
             raise Exception("Many products with same code")
-        product = product_obj.browse(cursor, user, product_id[0], context)
+        product = product_obj.browse(cr, uid, product_id[0], context)
         args = {
             'order_id':order.id,
             'name':line_name,
@@ -824,14 +827,15 @@ class PromotionsRulesActions(orm.Model):
             'product_uom_qty':1,
             'product_uom':product.uom_id.id
         }
-        return order.write({'order_line': [(0, 0, args)]})
+        self.create_line(cr, uid, args, context)
+        return True
 
-    def action_cart_disc_perc(self, cursor, user,
+    def action_cart_disc_perc(self, cr, uid,
                                action, order, context=None):
         """
         'Discount % on Sub Total'
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
@@ -846,14 +850,15 @@ class PromotionsRulesActions(orm.Model):
             'promotion_line':True,
             'product_uom':PRODUCT_UOM_ID
         }
-        return order.write({'order_line': [(0, 0, args)]})
+        self.create_line(cr, uid, args, context)
+        return True
 
-    def action_cart_disc_fix(self, cursor, user,
+    def action_cart_disc_fix(self, cr, uid,
                               action, order, context=None):
         """
         'Fixed amount on Sub Total'
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
@@ -868,14 +873,15 @@ class PromotionsRulesActions(orm.Model):
                 'promotion_line':True,
                 'product_uom':PRODUCT_UOM_ID
             }
-            return order.write({'order_line': [(0, 0, args)]})
+            self.create_line(cr, uid, args, context)
+            return True
 
-    def create_y_line(self, cursor, user, action,
+    def create_y_line(self, cr, uid, action,
                        order, quantity, product_id, context=None):
         """
         Create new order line for product
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param quantity: quantity of new free product
@@ -884,7 +890,7 @@ class PromotionsRulesActions(orm.Model):
         """
         order_line_obj = self.pool.get('sale.order.line')
         product_obj = self.pool.get('product.product')
-        product_y = product_obj.browse(cursor, user, product_id[0])
+        product_y = product_obj.browse(cr, uid, product_id[0])
         vals = {
             'order_id':order.id,
             'product_id':product_y.id,
@@ -896,14 +902,15 @@ class PromotionsRulesActions(orm.Model):
             'product_uom_qty':quantity,
             'product_uom':product_y.uom_id.id
         }
-        return order.write({'order_line': [(0, 0, vals)]})
+        self.create_line(cr, uid, vals, context)
+        return True
 
-    def action_prod_x_get_y(self, cursor, user,
+    def action_prod_x_get_y(self, cr, uid,
                              action, order, context=None):
         """
         'Buy X get Y free:[Only for integers]'
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
@@ -920,7 +927,7 @@ class PromotionsRulesActions(orm.Model):
         #Get Product
         product_x_code, product_y_code = [eval(code) \
                                 for code in action.product_code.split(",")]
-        product_id = product_obj.search(cursor, user,
+        product_id = product_obj.search(cr, uid,
                                 [('default_code', '=', product_y_code)],
             context=context)
         if not product_id:
@@ -947,7 +954,7 @@ class PromotionsRulesActions(orm.Model):
         tot_free_y = int(int(prod_qty.get(product_x_code, 0) / qty_x) * qty_y)
         #If y is already in the cart discount it?
         qty_y_in_cart = prod_qty.get(product_y_code, 0)
-        existing_order_line_ids = order_line_obj.search(cursor, user,
+        existing_order_line_ids = order_line_obj.search(cr, uid,
                                            [
                                 ('order_id', '=', order.id),
                                 ('product_id.default_code',
@@ -956,7 +963,7 @@ class PromotionsRulesActions(orm.Model):
                                            context=context
                                                 )
         if existing_order_line_ids:
-            update_order_line = order_line_obj.browse(cursor, user,
+            update_order_line = order_line_obj.browse(cr, uid,
                                             existing_order_line_ids[0],
                                             context)
             #Update that line
@@ -971,7 +978,7 @@ class PromotionsRulesActions(orm.Model):
                                                 )
                 if qty_y_in_cart <= tot_free_y:
                         #Quantity in cart is less then increase to total free
-                    order_line_obj.write(cursor, user, update_order_line.id,
+                    order_line_obj.write(cr, uid, update_order_line.id,
                                          {
                                           'name':line_name,
                                           'product_uom_qty': tot_free_y,
@@ -982,12 +989,12 @@ class PromotionsRulesActions(orm.Model):
                 else:
                         #If the order has come for 5 and only 3 are free
                         #then convert paid order to 2 units and rest free
-                    order_line_obj.write(cursor, user, update_order_line.id,
+                    order_line_obj.write(cr, uid, update_order_line.id,
                                          {
                                     'product_uom_qty': qty_y_in_cart - tot_free_y,
                                     'orig_qty': update_order_line.product_uom_qty,
                                           }, context)
-                    self.create_y_line(cursor, user, action,
+                    self.create_y_line(cr, uid, action,
                                             order,
                                             tot_free_y,
                                             product_id,
@@ -996,38 +1003,38 @@ class PromotionsRulesActions(orm.Model):
                     #delete the other lines
                 existing_order_line_ids.remove(existing_order_line_ids[0])
                 if existing_order_line_ids:
-                    order_line_obj.unlink(cursor, user,
+                    order_line_obj.unlink(cr, uid,
                                           existing_order_line_ids, context)
                 return True
         else:
             #Dont create line if quantity is not there
             if not tot_free_y:
                 return True
-            return self.create_y_line(cursor, user, action,
+            return self.create_y_line(cr, uid, action,
                                        order, tot_free_y, product_id, context)
 
-    def execute(self, cursor, user, action_id,
+    def execute(self, cr, uid, action_id,
                                    order, context=None):
         """
         Executes the action into the order
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param action_id: Action to be taken on sale order
         @param order: sale order
         @param context: Context(no direct use).
         """
-        # self.clear_existing_promotion_lines(cursor, user, order, context)
-        action = self.browse(cursor, user, action_id, context)
+        # self.clear_existing_promotion_lines(cr, uid, order, context)
+        action = self.browse(cr, uid, action_id, context)
         method_name = 'action_' + action.action_type
-        return getattr(self, method_name).__call__(cursor, user, action,
+        return getattr(self, method_name).__call__(cr, uid, action,
                                                    order, context)
 
-    def validate(self, cursor, user, vals, context):
+    def validate(self, cr, uid, vals, context):
         """
         Validates if the values are coherent with
         attribute
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param vals: Values of current record.
         @param context: Context(no direct use).
         """
@@ -1069,26 +1076,26 @@ class PromotionsRulesActions(orm.Model):
 
         return True
 
-    def create(self, cursor, user, vals, context=None):
+    def create(self, cr, uid, vals, context=None):
         """
         Validate before save
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param vals: Values of current record.
         @param context: Context(no direct use).
         """
         try:
-            self.validate(cursor, user, vals, context)
+            self.validate(cr, uid, vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
-        super(PromotionsRulesActions, self).create(cursor, user,
+        super(PromotionsRulesActions, self).create(cr, uid,
                                                            vals, context)
 
-    def write(self, cursor, user, ids, vals, context):
+    def write(self, cr, uid, ids, vals, context):
         """
         Validate before Write
-        @param cursor: Database Cursor
-        @param user: ID of User
+        @param cr: Database cr
+        @param uid: ID of uid
         @param vals: Values of current record.
         @param context: Context(no direct use).
         """
@@ -1096,15 +1103,15 @@ class PromotionsRulesActions(orm.Model):
         if type(ids) in [list, tuple] and ids:
             ids = ids[0]
         try:
-            old_vals = self.read(cursor, user, ids,
+            old_vals = self.read(cr, uid, ids,
                                  ['action_type', 'product_code', 'arguments'],
                                  context)
             old_vals.update(vals)
             old_vals.has_key('id') and old_vals.pop('id')
-            self.validate(cursor, user, old_vals, context)
+            self.validate(cr, uid, old_vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
         #only value may have changed and client gives only value
         vals = old_vals
-        super(PromotionsRulesActions, self).write(cursor, user, ids,
+        super(PromotionsRulesActions, self).write(cr, uid, ids,
                                                            vals, context)
