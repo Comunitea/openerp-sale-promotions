@@ -635,7 +635,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
         vals['serialised_expr'] = self.serialise(vals['attribute'],
                                                  vals['comparator'],
                                                  vals['value'])
-        super(PromotionsRulesConditionsExprs, self).create(cr, uid,
+        return super(PromotionsRulesConditionsExprs, self).create(cr, uid,
                                                            vals, context)
 
     def write(self, cr, uid, ids, vals, context):
@@ -664,7 +664,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
         vals['serialised_expr'] = self.serialise(vals['attribute'],
                                                  vals['comparator'],
                                                  vals['value'])
-        super(PromotionsRulesConditionsExprs, self).write(cr, uid, ids,
+        return super(PromotionsRulesConditionsExprs, self).write(cr, uid, ids,
                                                            vals, context)
 
 
@@ -1088,7 +1088,7 @@ class PromotionsRulesActions(orm.Model):
             self.validate(cr, uid, vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
-        super(PromotionsRulesActions, self).create(cr, uid,
+        return super(PromotionsRulesActions, self).create(cr, uid,
                                                            vals, context)
 
     def write(self, cr, uid, ids, vals, context):
@@ -1113,5 +1113,5 @@ class PromotionsRulesActions(orm.Model):
             raise orm.except_orm("Invalid Expression", ustr(e))
         #only value may have changed and client gives only value
         vals = old_vals
-        super(PromotionsRulesActions, self).write(cr, uid, ids,
+        return super(PromotionsRulesActions, self).write(cr, uid, ids,
                                                            vals, context)
