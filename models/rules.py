@@ -793,6 +793,7 @@ class PromotionsRulesActions(orm.Model):
                                      order_line.id,
                                      {
                                       'discount':eval(action.arguments),
+                                      'old_discount': order_line.discount,
                                       },
                                      context
                                      )
@@ -947,71 +948,15 @@ class PromotionsRulesActions(orm.Model):
         #Total number of free units of y to give
         qty_y_in_cart = prod_qty.get(product_y_code, 0)
         if product_x_code == product_y_code:
-            tot_free_y = int(int(qty_y_in_cart / (qty_x + qty_y)) * qty_y)
+            diff_x_y = qty_y - qty_x
+            tot_free_y = int(qty_y_in_cart / qty_x) * diff_x_y
         else:
-            tot_free_y = int(int(qty_y_in_cart / qty_x) * qty_y)
+            tot_free_y = int(qty_y_in_cart / qty_x) * qty_y
 
-        tot_free_y = int(int(prod_qty.get(product_x_code, 0) / qty_x) * qty_y)
-        #If y is already in the cart discount it?
-        qty_y_in_cart = prod_qty.get(product_y_code, 0)
-        existing_order_line_ids = order_line_obj.search(cr, uid,
-                                           [
-                                ('order_id', '=', order.id),
-                                ('product_id.default_code',
-                                            '=', product_y_code)
-                                            ],
-                                           context=context
-                                                )
-        if existing_order_line_ids:
-            update_order_line = order_line_obj.browse(cr, uid,
-                                            existing_order_line_ids[0],
-                                            context)
-            #Update that line
-            #The replace is required because on secondary update
-            #the name may be repeated
-            if tot_free_y:
-                line_name = "%s (%s)" % (
-                                        update_order_line.name.replace(
-                                            '(%s)' % action.promotion.name,
-                                                                ''),
-                                        action.promotion.name
-                                                )
-                if qty_y_in_cart <= tot_free_y:
-                        #Quantity in cart is less then increase to total free
-                    order_line_obj.write(cr, uid, update_order_line.id,
-                                         {
-                                          'name':line_name,
-                                          'product_uom_qty': tot_free_y,
-                                          'orig_qty': update_order_line.product_uom_qty,
-                                          'discount': 100,
-                                          }, context)
-
-                else:
-                        #If the order has come for 5 and only 3 are free
-                        #then convert paid order to 2 units and rest free
-                    order_line_obj.write(cr, uid, update_order_line.id,
-                                         {
-                                    'product_uom_qty': qty_y_in_cart - tot_free_y,
-                                    'orig_qty': update_order_line.product_uom_qty,
-                                          }, context)
-                    self.create_y_line(cr, uid, action,
-                                            order,
-                                            tot_free_y,
-                                            product_id,
-                                            context
-                                            )
-                    #delete the other lines
-                existing_order_line_ids.remove(existing_order_line_ids[0])
-                if existing_order_line_ids:
-                    order_line_obj.unlink(cr, uid,
-                                          existing_order_line_ids, context)
-                return True
-        else:
-            #Dont create line if quantity is not there
-            if not tot_free_y:
-                return True
-            return self.create_y_line(cr, uid, action,
-                                       order, tot_free_y, product_id, context)
+        if not tot_free_y:
+            return True
+        return self.create_y_line(cr, uid, action,
+                                   order, tot_free_y, product_id, context)
 
     def execute(self, cr, uid, action_id,
                                    order, context=None):
