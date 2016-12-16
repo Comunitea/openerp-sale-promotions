@@ -12,6 +12,7 @@
     'category': 'Generic Modules/Sales & Purchases',
     'depends': ['base', 'sale'],
     'data': [
+        'data/product_data.xml',
         'views/rule.xml',
         'views/sale.xml',
         'security/ir.model.access.csv',

@@ -18,10 +18,8 @@
             <field name="type">form</field>
             <field name="inherit_id" ref="sale.view_order_form" />
             <field name="arch" type="xml">
-                <button name="action_view_invoice" position="before">
-                    <group colspan="4" col="13">
-                        <button name="apply_promotions" type="object" states="draft" string="Apply Promotions" />
-                    </group>
+                <button name="action_cancel" position="after">
+                    <button name="apply_promotions" type="object" states="draft" string="Apply Promotions" />
                 </button>
             </field>
         </record>

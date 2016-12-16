@@ -32,6 +32,8 @@ ATTRIBUTES = [
     # ('tot_weight', 'Total Weight'),
     # ('tot_item_qty', 'Total Items Quantity'),
     ('custom', 'Custom domain expression'),
+    ('pallet', 'Number of pallets'),
+    ('ship_address', 'Ship Address'),
 ]
 
 COMPARATORS = [
@@ -47,11 +49,11 @@ COMPARATORS = [
 
 ACTION_TYPES = [
     ('prod_disc_perc', _('Discount % on Product')),
-    ('line_prod_disc_perc', _('Discount % on Product in new line')),
     ('prod_disc_fix', _('Fixed amount on Product')),
     ('cart_disc_perc', _('Discount % on Sub Total')),
     ('cart_disc_fix', _('Fixed amount on Sub Total')),
-    ('prod_x_get_y', _('Buy X get Y free'))
+    ('prod_x_get_y', _('Buy X get Y free')),
+    ('line_prod_disc_perc', _('Product Discount in new line')),
 ]
 
 
@@ -322,6 +324,15 @@ class PromotionsRulesConditionsExprs(orm.Model):
         # Case 4
         if attribute in ['amount_untaxed', 'amount_tax', 'amount_total']:
             return {'value': {'value': "0.00"}}
+
+        # Case 5
+        if attribute in ['pallet']:
+            return {'value': {'value': "0.00"}}
+
+        # Case 6
+        if attribute in ['ship_address']:
+            return {'value': {'value': "'city_name'"}}
+
         return {}
 
     _columns = {
@@ -362,6 +373,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
                          'prod_net_price',
                          'comp_sub_total',
                          'comp_sub_total_x',
+                         'pallet'
                          ] and comparator not in numerical_comparators:
             raise Exception("Only %s can be used with %s"
                             % ",".join(numerical_comparators), attribute)
@@ -398,6 +410,12 @@ class PromotionsRulesConditionsExprs(orm.Model):
                 raise Exception(
                     "Value for computed subtotal combination is invalid\n"
                     "Eg for right format is `['code1,code2',..]|120.50`")
+
+        # Mismarch 5_
+        if attribute == 'ship_address' and comparator != '==':
+            raise Exception("Only comparator '==' is allowed for this \
+                             attribute")
+
         # After all validations say True
         return True
 
@@ -409,6 +427,9 @@ class PromotionsRulesConditionsExprs(orm.Model):
         @param comparator: Comparator used in promo expression.
         @param value: value according which attribute will be compared
         """
+
+        res = "order.%s %s %s" % (attribute, comparator, value)
+
         if attribute == 'custom':
             return value
         if attribute == 'product':
@@ -422,20 +443,24 @@ class PromotionsRulesConditionsExprs(orm.Model):
                          'prod_net_price',
                          ]:
             product_code, quantity = value.split(",")
-            return '(%s in products) and (%s["%s"] %s %s)' \
-                   % (product_code, attribute, eval(product_code),
-                       comparator, quantity)
+            res = '(%s in products) and (%s["%s"] %s %s)' \
+                  % (product_code, attribute, eval(product_code),
+                     comparator, quantity)
         if attribute == 'comp_sub_total':
             product_codes_iter, value = value.split("|")
-            return """sum(
+            res = """sum(
                 [prod_sub_total.get(prod_code,0) for prod_code in %s]
                 ) %s %s""" % (eval(product_codes_iter), comparator, value)
         if attribute == 'comp_sub_total_x':
             product_codes_iter, value = value.split("|")
-            return """(sum(prod_sub_total.values()) - sum(
+            res = """(sum(prod_sub_total.values()) - sum(
                 [prod_sub_total.get(prod_code,0) for prod_code in %s]
                 )) %s %s""" % (eval(product_codes_iter), comparator, value)
-        return "order.%s %s %s" % (attribute, comparator, value)
+        if attribute == 'pallet':
+            res = """sum(prod_pallet.values()) %s %s""" % (comparator, value)
+        if attribute == 'ship_address':
+            res = """order.partner_shipping_id.city == %s""" % value
+        return res
 
     def evaluate(self, cr, uid,
                  expression, order, context=None):
@@ -450,12 +475,14 @@ class PromotionsRulesConditionsExprs(orm.Model):
         """
         products = []   # List of product Codes
         prod_qty = {}   # Dict of product_code:quantity
+        prod_pallet = {}   # Dict of product_code:number_of_pallets
         prod_unit_price = {}
         prod_sub_total = {}
         prod_discount = {}
         prod_weight = {}
         # prod_net_price = {}
         prod_lines = {}
+
         for line in order.order_line:
             if line.product_id:
                 product_code = line.product_id.code
@@ -475,6 +502,16 @@ class PromotionsRulesConditionsExprs(orm.Model):
                     prod_discount.get(product_code, 0.00) + line.discount
                 prod_weight[product_code] = \
                     prod_weight.get(product_code, 0.00) + line.th_weight
+
+                # Get number of entire pallets
+                entire_pallets = 0
+                packing = line.product_id.packaging_ids and \
+                    line.product_id.packaging_ids or False
+                if packing and packing.ul.type == 'pallet' and packing.qty:
+                    entire_pallets = line.product_uom_qty // packing.qty
+
+                prod_pallet[product_code] = \
+                    prod_pallet.get(product_code, 0.00) + entire_pallets
         return eval(expression.serialised_expr)
 
     def create(self, cr, uid, vals, context=None):
@@ -512,7 +549,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
                                  ['attribute', 'comparator', 'value'],
                                  context)
             old_vals.update(vals)
-            old_vals in ('id') and old_vals.pop('id')
+            'id' in old_vals and old_vals.pop('id')
             self.validate(cr, uid, old_vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
@@ -571,37 +608,37 @@ class PromotionsRulesActions(orm.Model):
         'promotion': fields.many2one('promos.rules', 'Promotion'),
     }
 
-    '''def clear_existing_promotion_lines(self, cr, uid,
-                                        order, context=None):
-        """
-        Deletes existing promotion lines before applying
-        @param cr: Database cr
-        @param uid: ID of uid
-        @param order: Sale order
-        @param context: Context(no direct use).
-        """
-        order_line_obj = self.pool.get('sale.order.line')
-        #Delete all promotion lines
-        order_line_ids = order_line_obj.search(cr, uid,
-                                            [
-                                             ('order_id', '=', order.id),
-                                             ('promotion_line', '=', True),
-                                            ], context=context
-                                            )
-        if order_line_ids:
-            order_line_obj.unlink(cr, uid, order_line_ids, context)
-        #Clear discount column
-        order_line_ids = order_line_obj.search(cr, uid,
-                                            [
-                                             ('order_id', '=', order.id),
-                                            ], context=context
-                                            )
-        if order_line_ids:
-            order_line_obj.write(cr, uid,
-                                 order_line_ids,
-                                 {'discount':0.00},
-                                 context=context)
-        return True'''
+    # def clear_existing_promotion_lines(self, cr, uid,
+    #                                     order, context=None):
+    #     """
+    #     Deletes existing promotion lines before applying
+    #     @param cr: Database cr
+    #     @param uid: ID of uid
+    #     @param order: Sale order
+    #     @param context: Context(no direct use).
+    #     """
+    #     order_line_obj = self.pool.get('sale.order.line')
+    #     #Delete all promotion lines
+    #     order_line_ids = order_line_obj.search(cr, uid,
+    #                                         [
+    #                                          ('order_id', '=', order.id),
+    #                                          ('promotion_line', '=', True),
+    #                                         ], context=context
+    #                                         )
+    #     if order_line_ids:
+    #         order_line_obj.unlink(cr, uid, order_line_ids, context)
+    #     #Clear discount column
+    #     order_line_ids = order_line_obj.search(cr, uid,
+    #                                         [
+    #                                          ('order_id', '=', order.id),
+    #                                         ], context=context
+    #                                         )
+    #     if order_line_ids:
+    #         order_line_obj.write(cr, uid,
+    #                              order_line_ids,
+    #                              {'discount':0.00},
+    #                              context=context)
+    #     return True
 
     def create_line(self, cr, uid, vals, context):
         return self.pool.get('sale.order.line').create(cr, uid, vals, context)
@@ -634,10 +671,14 @@ class PromotionsRulesActions(orm.Model):
         @param context: Context(no direct use).
         """
         # order_line_obj = self.pool.get('sale.order.line')
-        line_name = '%s on %s' % (action.promotion.name,
-                                  eval(action.product_code))
+        line_name = action.promotion.name
+
+        obj_data = self.pool.get('ir.model.data')
+        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
+                                                'product_discount')[1]
         for order_line in order.order_line:
-            if order_line.product_id.code == eval(action.product_code):
+            if not action.product_code or \
+                    order_line.product_id.code == eval(action.product_code):
                 disc = eval(action.arguments)
                 args = {
                     'order_id': order.id,
@@ -645,9 +686,11 @@ class PromotionsRulesActions(orm.Model):
                     'price_unit': -(order.amount_untaxed * disc / 100),
                     'product_uom_qty': 1,
                     'promotion_line': True,
-                    'product_uom': order_line.product_uom.id
+                    'product_uom': order_line.product_uom.id,
+                    'product_id': prod_id,
+                    'tax_id': [(6, 0, [x.id for x in order_line.tax_id])]
                 }
-            self.create_line(cr, uid, args, context)
+                self.create_line(cr, uid, args, context)
             return True
 
     def action_prod_disc_fix(self, cr, uid,
@@ -885,7 +928,7 @@ class PromotionsRulesActions(orm.Model):
                                  ['action_type', 'product_code', 'arguments'],
                                  context)
             old_vals.update(vals)
-            old_vals in ('id') and old_vals.pop('id')
+            'id' in old_vals and old_vals.pop('id')
             self.validate(cr, uid, old_vals, context)
         except Exception, e:
             raise orm.except_orm("Invalid Expression", ustr(e))
