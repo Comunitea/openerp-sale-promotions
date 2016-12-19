@@ -36,6 +36,9 @@
                             <field name="from_date" />
                             <field name="to_date" />
                         </group>
+                        <group col="2" colspan="2" string="Restrict partners">
+                            <field name="partner_ids" widget="many2many_tags"/>
+                        </group>
                     </group>
                     <notebook colspan="4">
                         <page string="Conditions">
@@ -103,8 +106,8 @@
                     <field name="sequence" />
                     <field name="name" />
                     <field name="active" />
-                    <field name="coupon_code" />
-                    <field name="from_date" />
+<!--                     <field name="coupon_code" />
+                    <field name="from_date" /> -->
                     <field name="to_date" />
                 </tree>
             </field>

@@ -123,7 +123,15 @@ class PromotionsRules(orm.Model):
                                        'promotion',
                                        string='Expressions/Conditions'),
         'actions': fields.one2many('promos.rules.actions', 'promotion',
-                                   string="Actions")
+                                   string="Actions"),
+        'partner_ids': fields.many2many('res.partner',
+                                        'rule_partner_rel',
+                                        'partner_id',
+                                        'rule_id',
+                                        domain=[('customer', '=', True)],
+                                        string="Partner",
+                                        help="Applicable to all if \
+                                              none is selected"),
     }
     _defaults = {
         'logic': lambda * a: 'and',
@@ -266,6 +274,11 @@ class PromotionsRules(orm.Model):
         active_promos = self.search(cr, uid, domain, context=context)
 
         for promotion_rule in self.browse(cr, uid, active_promos, context):
+            # Check partner restrict
+            if promotion_rule.partner_ids and \
+                    order.partner_id not in promotion_rule.partner_ids:
+                continue
+
             result = self.evaluate(cr, uid, promotion_rule, order, context)
             if result:
                 try:

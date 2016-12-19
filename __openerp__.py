@@ -15,6 +15,7 @@
         'data/product_data.xml',
         'views/rule.xml',
         'views/sale.xml',
+        'views/res_partner_view.xml',
         'security/ir.model.access.csv',
     ],
     'installable': True,
