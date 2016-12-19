@@ -32,8 +32,9 @@ ATTRIBUTES = [
     # ('tot_weight', 'Total Weight'),
     # ('tot_item_qty', 'Total Items Quantity'),
     ('custom', 'Custom domain expression'),
-    ('pallet', 'Number of pallets'),
-    ('ship_address', 'Ship Address'),
+    ('pallet', 'Number of entire pallets'),
+    ('prod_pallet', 'Number pallets of product'),
+    ('ship_address', 'Ship Address City'),
 ]
 
 COMPARATORS = [
@@ -261,8 +262,8 @@ class PromotionsRules(orm.Model):
         """
         order = self.pool.get('sale.order').browse(cr, uid,
                                                    order_id, context=context)
-        active_promos = self.search(cr, uid, [('active', '=', True)],
-                                    context=context)
+        domain = [('active', '=', True)]
+        active_promos = self.search(cr, uid, domain, context=context)
 
         for promotion_rule in self.browse(cr, uid, active_promos, context):
             result = self.evaluate(cr, uid, promotion_rule, order, context)
@@ -333,6 +334,10 @@ class PromotionsRulesConditionsExprs(orm.Model):
         if attribute in ['ship_address']:
             return {'value': {'value': "'city_name'"}}
 
+        # Case 7
+        if attribute in ['prod_pallet']:
+            return {'value': {'value': "'product_code',0.00"}}
+
         return {}
 
     _columns = {
@@ -388,6 +393,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
                          'prod_discount',
                          'prod_weight',
                          'prod_net_price',
+                         'prod_pallet',
                          ]:
             try:
                 product_code, quantity = value.split(",")
@@ -460,6 +466,10 @@ class PromotionsRulesConditionsExprs(orm.Model):
             res = """sum(prod_pallet.values()) %s %s""" % (comparator, value)
         if attribute == 'ship_address':
             res = """order.partner_shipping_id.city == %s""" % value
+        if attribute == 'prod_pallet':
+            product_code, qty = value.split(',')
+            res = """prod_pallet.get(%s, 0.0) %s %s""" %\
+                (product_code, comparator, qty)
         return res
 
     def evaluate(self, cr, uid,
