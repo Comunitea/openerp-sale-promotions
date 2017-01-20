@@ -2,12 +2,6 @@
 # © 2016 Comunitea - Javier Colmenero <javier@comunitea.com>
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
 
-try:
-    # Backward compatible
-    from sets import Set as set
-except:
-    pass
-
 from openerp.osv import orm, fields
 from openerp.tools.misc import ustr
 from openerp.tools.translate import _
@@ -54,7 +48,9 @@ ACTION_TYPES = [
     ('cart_disc_perc', _('Discount % on Sub Total')),
     ('cart_disc_fix', _('Fixed amount on Sub Total')),
     ('prod_x_get_y', _('Buy X get Y free')),
-    ('line_prod_disc_perc', _('Product Discount in new line')),
+    ('line_prod_disc_perc', _('New line discount, over order subtotal')),
+    ('line_discount_group_price', _('New line discount, over price unit')),
+    ('line_discount_mult_pallet', _('New line discount, multiply of pallet')),
 ]
 
 
@@ -98,6 +94,7 @@ class PromotionsRules(orm.Model):
                                                'rule_partner_cat_rel',
                                                'category_id',
                                                'rule_id',
+                                               copy=True,
                                                string="Partner Categories",
                                                help="Applicable to all if \
                                                      none is selected"),
@@ -121,9 +118,11 @@ class PromotionsRules(orm.Model):
                                                   required=True),
         'expressions': fields.one2many('promos.rules.conditions.exps',
                                        'promotion',
+                                       copy=True,
                                        string='Expressions/Conditions'),
         'actions': fields.one2many('promos.rules.actions', 'promotion',
-                                   string="Actions"),
+                                   string="Actions",
+                                   copy=True),
         'partner_ids': fields.many2many('res.partner',
                                         'rule_partner_rel',
                                         'partner_id',
@@ -263,6 +262,30 @@ class PromotionsRules(orm.Model):
                 raise error
         return True
 
+    def _get_promotions_domain(self, order):
+        """
+        Obtengo domain del tipo A AND (B OR C) AND (D OR F) ....
+        """
+        domain = ['&', '&', '&', '&',
+                  ('active', '=', True),
+                  '|',
+                  ('partner_ids', '=', False),
+                  ('partner_ids', 'in', [order.partner_id.id]),
+                  '|',
+                  ('from_date', '=', False),
+                  ('from_date', '>=', order.date_order),
+                  '|',
+                  ('to_date', '=', False),
+                  ('to_date', '<=', order.date_order)]
+
+        if order.partner_id.category_id:
+            cat_id = order.partner_id.category_id.id
+            domain += ['|', ('partner_categories', 'in', [cat_id]),
+                       ('partner_categories', '=', False)]
+        else:
+            domain += [('partner_categories', '=', False)]
+        return domain
+
     def apply_promotions(self, cr, uid, order_id, context=None):
         """
         Get all active promiotions, evaluate it, and execute if evaluation
@@ -270,14 +293,14 @@ class PromotionsRules(orm.Model):
         """
         order = self.pool.get('sale.order').browse(cr, uid,
                                                    order_id, context=context)
-        domain = [('active', '=', True)]
+        domain = self._get_promotions_domain(order)
         active_promos = self.search(cr, uid, domain, context=context)
 
         for promotion_rule in self.browse(cr, uid, active_promos, context):
             # Check partner restrict
-            if promotion_rule.partner_ids and \
-                    order.partner_id not in promotion_rule.partner_ids:
-                continue
+            # if promotion_rule.partner_ids and \
+            #         order.partner_id not in promotion_rule.partner_ids:
+            #     continue
 
             result = self.evaluate(cr, uid, promotion_rule, order, context)
             if result:
@@ -506,7 +529,8 @@ class PromotionsRulesConditionsExprs(orm.Model):
         # prod_net_price = {}
         prod_lines = {}
 
-        for line in order.order_line:
+        for line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
             if line.product_id:
                 product_code = line.product_id.code
                 products.append(product_code)
@@ -631,38 +655,6 @@ class PromotionsRulesActions(orm.Model):
         'promotion': fields.many2one('promos.rules', 'Promotion'),
     }
 
-    # def clear_existing_promotion_lines(self, cr, uid,
-    #                                     order, context=None):
-    #     """
-    #     Deletes existing promotion lines before applying
-    #     @param cr: Database cr
-    #     @param uid: ID of uid
-    #     @param order: Sale order
-    #     @param context: Context(no direct use).
-    #     """
-    #     order_line_obj = self.pool.get('sale.order.line')
-    #     #Delete all promotion lines
-    #     order_line_ids = order_line_obj.search(cr, uid,
-    #                                         [
-    #                                          ('order_id', '=', order.id),
-    #                                          ('promotion_line', '=', True),
-    #                                         ], context=context
-    #                                         )
-    #     if order_line_ids:
-    #         order_line_obj.unlink(cr, uid, order_line_ids, context)
-    #     #Clear discount column
-    #     order_line_ids = order_line_obj.search(cr, uid,
-    #                                         [
-    #                                          ('order_id', '=', order.id),
-    #                                         ], context=context
-    #                                         )
-    #     if order_line_ids:
-    #         order_line_obj.write(cr, uid,
-    #                              order_line_ids,
-    #                              {'discount':0.00},
-    #                              context=context)
-    #     return True
-
     def create_line(self, cr, uid, vals, context):
         return self.pool.get('sale.order.line').create(cr, uid, vals, context)
 
@@ -676,45 +668,13 @@ class PromotionsRulesActions(orm.Model):
         @param context: Context(no direct use).
         """
         order_line_obj = self.pool.get('sale.order.line')
-        for order_line in order.order_line:
+        for order_line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
             if order_line.product_id.code == eval(action.product_code):
                 return order_line_obj.\
                     write(cr, uid, order_line.id,
                           {'discount': eval(action.arguments),
                            'old_discount': order_line.discount}, context)
-
-    def action_line_prod_disc_perc(self, cr, uid,
-                                   action, order, context=None):
-        """
-        Action for 'Discount % on Product in new line'
-        @param cr: Database cr
-        @param uid: ID of uid
-        @param action: Action to be taken on sale order
-        @param order: sale order
-        @param context: Context(no direct use).
-        """
-        # order_line_obj = self.pool.get('sale.order.line')
-        line_name = action.promotion.name
-
-        obj_data = self.pool.get('ir.model.data')
-        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
-                                                'product_discount')[1]
-        for order_line in order.order_line:
-            if not action.product_code or \
-                    order_line.product_id.code == eval(action.product_code):
-                disc = eval(action.arguments)
-                args = {
-                    'order_id': order.id,
-                    'name': line_name,
-                    'price_unit': -(order.amount_untaxed * disc / 100),
-                    'product_uom_qty': 1,
-                    'promotion_line': True,
-                    'product_uom': order_line.product_uom.id,
-                    'product_id': prod_id,
-                    'tax_id': [(6, 0, [x.id for x in order_line.tax_id])]
-                }
-                self.create_line(cr, uid, args, context)
-            return True
 
     def action_prod_disc_fix(self, cr, uid,
                              action, order, context=None):
@@ -847,7 +807,8 @@ class PromotionsRulesActions(orm.Model):
         # get Quantity
         qty_x, qty_y = [eval(arg) for arg in action.arguments.split(",")]
         # Build a dictionary of product_code to quantity
-        for order_line in order.order_line:
+        for order_line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
             if order_line.product_id:
                 product_code = order_line.product_id.default_code
                 prod_qty[product_code] = \
@@ -865,6 +826,119 @@ class PromotionsRulesActions(orm.Model):
             return True
         return self.create_y_line(cr, uid, action, order, tot_free_y,
                                   product_id, context)
+
+    def action_line_prod_disc_perc(self, cr, uid,
+                                   action, order, context=None):
+        """
+        Crea una nueva linea de cantidad 1 y precio_unitario el descuento
+        sobre el subtotal del pedido
+        """
+        line_name = action.promotion.name
+
+        obj_data = self.pool.get('ir.model.data')
+        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
+                                                'product_discount')[1]
+        for order_line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
+            if not action.product_code or \
+                    order_line.product_id.code == eval(action.product_code):
+                disc = eval(action.arguments)
+                args = {
+                    'order_id': order.id,
+                    'name': line_name,
+                    'price_unit': -(order.amount_untaxed * disc / 100),
+                    'product_uom_qty': 1,
+                    'promotion_line': True,
+                    'product_uom': order_line.product_uom.id,
+                    'product_id': prod_id,
+                    'tax_id': [(6, 0, [x.id for x in order_line.tax_id])]
+                }
+                self.create_line(cr, uid, args, context)
+            return True
+
+    def action_line_discount_group_price(self, cr, uid, action, order,
+                                         context=None):
+        """
+        Crea una linea descuento con el descuento apñicado al precio unitario
+        y la cantadid será la suma de las lineas implicadas. Se crea una linea
+        descuento a mayores por cada linea implicada con un precio diferente
+        """
+        line_name = action.promotion.name
+
+        obj_data = self.pool.get('ir.model.data')
+        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
+                                                'product_discount')[1]
+        group_dic = {}  # Agrupar lineas del mismo precio y producto
+        restrict_codes = False
+        if action.product_code:
+            restrict_codes = action.product_code.replace("'", '').split(',')
+        for line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
+            if restrict_codes and line.product_id.code not in restrict_codes:
+                continue
+            key = line.price_unit
+            if key not in group_dic:
+                group_dic[key] = [0.0, []]
+            group_dic[key][0] += line.product_uom_qty
+            group_dic[key][1] += line
+
+        for price in group_dic:
+            qty = group_dic[price][0]
+            lines = group_dic[price][1]
+            disc = eval(action.arguments)
+            taxes = set()
+            for l in lines:
+                for t in l.tax_id:
+                    taxes.add(t.id)
+            taxes = list(set(taxes))
+            args = {
+                'order_id': order.id,
+                'name': line_name,
+                'price_unit': -(price * disc / 100),
+                'product_uom_qty': qty,
+                'promotion_line': True,
+                'product_uom': lines[0].product_uom.id,
+                'product_id': prod_id,
+                'tax_id': [(6, 0, taxes)]
+            }
+            self.create_line(cr, uid, args, context)
+        return
+
+    def action_line_discount_mult_pallet(self, cr, uid, action, order,
+                                         context=None):
+        """
+        Crea una linea descuento por cada linea que cumpla que hay un número
+        de pallets, múltiplo de 1.
+        """
+        line_name = action.promotion.name
+
+        obj_data = self.pool.get('ir.model.data')
+        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
+                                                'product_discount')[1]
+
+        for line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
+            packing = line.product_id.packaging_ids \
+                and line.product_id.packaging_ids or False
+            num_pallets = 0.0
+            if packing and packing.ul.type == 'pallet' and packing.qty:
+                num_pallets = line.product_uom_qty / packing.qty
+            if not num_pallets or num_pallets % 1 != 0:
+                continue
+
+            disc = eval(action.arguments)
+            args = {
+                'order_id': order.id,
+                'name': line_name,
+                'price_unit': -(line.price_unit * disc / 100),
+                'product_uom_qty': line.product_uom_qty,
+                'promotion_line': True,
+                'product_uom': line.product_uom.id,
+                'product_id': prod_id,
+                'tax_id': [(6, 0, [x.id for x in line.tax_id])]
+            }
+            self.create_line(cr, uid, args, context)
+        return
 
     def execute(self, cr, uid, action_id, order, context=None):
         """
