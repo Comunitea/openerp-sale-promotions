@@ -10,7 +10,7 @@
               'Comunitea'
     'website': 'http://openlabs.co.in',
     'category': 'Generic Modules/Sales & Purchases',
-    'depends': ['base', 'sale'],
+    'depends': ['base', 'sale_stock'],
     'data': [
         'data/product_data.xml',
         'views/rule.xml',

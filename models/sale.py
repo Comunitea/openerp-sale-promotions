@@ -82,6 +82,23 @@ class SaleOrderLine(orm.Model):
                                                created by promotions"),
         'orig_qty': fields.float('Original qty'),
         'old_discount': fields.float('Old discount', digits=(5, 2),
-                                     readonly=True)
-
+                                     readonly=True),
+        'orig_line_ids': fields.many2many('sale.order.line',
+                                          'line_promo_line_rel',
+                                          'line_id1',
+                                          'line_id2', 'From lines')
     }
+
+    def invoice_line_create(self, cr, uid, ids, context=None):
+        """
+        No crear lineas de factura si son promociones, las crearemos después.
+        """
+        no_promo_ids = []
+        for l in self.browse(cr, uid, ids):
+            if l.promotion_line:
+                continue
+            no_promo_ids.append(l.id)
+        res = super(SaleOrderLine, self).invoice_line_create(cr, uid,
+                                                             no_promo_ids,
+                                                             context=context)
+        return res

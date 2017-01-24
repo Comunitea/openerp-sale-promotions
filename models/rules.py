@@ -856,32 +856,24 @@ class PromotionsRulesActions(orm.Model):
                 self.create_line(cr, uid, args, context)
             return True
 
-    def action_line_discount_group_price(self, cr, uid, action, order,
-                                         context=None):
+    def _create_lines_groped_by_price(self, cr, uid, action, order,
+                                      selected_lines, context=None):
         """
-        Crea una linea descuento con el descuento apñicado al precio unitario
-        y la cantadid será la suma de las lineas implicadas. Se crea una linea
-        descuento a mayores por cada linea implicada con un precio diferente
+        Crea lineas de descuento agrupandolas por precio, con decuento sobre
+        precio unitario, y agrupándolas por cantidad.
         """
-        line_name = action.promotion.name
-
+        group_dic = {}  # Agrupar lineas del mismo precio y producto
         obj_data = self.pool.get('ir.model.data')
         prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
                                                 'product_discount')[1]
-        group_dic = {}  # Agrupar lineas del mismo precio y producto
-        restrict_codes = False
-        if action.product_code:
-            restrict_codes = action.product_code.replace("'", '').split(',')
-        for line in order.order_line.\
-                filtered(lambda l: not l.product_id.no_promo):
-            if restrict_codes and line.product_id.code not in restrict_codes:
-                continue
+        for line in selected_lines:
             key = line.price_unit
             if key not in group_dic:
                 group_dic[key] = [0.0, []]
             group_dic[key][0] += line.product_uom_qty
             group_dic[key][1] += line
 
+        line_name = action.promotion.name
         for price in group_dic:
             qty = group_dic[price][0]
             lines = group_dic[price][1]
@@ -899,9 +891,31 @@ class PromotionsRulesActions(orm.Model):
                 'promotion_line': True,
                 'product_uom': lines[0].product_uom.id,
                 'product_id': prod_id,
-                'tax_id': [(6, 0, taxes)]
+                'tax_id': [(6, 0, taxes)],
+                'orig_line_ids': [(6, 0, [x.id for x in lines])]
             }
             self.create_line(cr, uid, args, context)
+        return
+
+    def action_line_discount_group_price(self, cr, uid, action, order,
+                                         context=None):
+        """
+        Crea una linea descuento con el descuento apñicado al precio unitario
+        y la cantadid será la suma de las lineas implicadas. Se crea una linea
+        descuento a mayores por cada linea implicada con un precio diferente
+        """
+
+        selected_lines = []
+        restrict_codes = False
+        if action.product_code:
+            restrict_codes = action.product_code.replace("'", '').split(',')
+        for line in order.order_line.\
+                filtered(lambda l: not l.product_id.no_promo):
+            if restrict_codes and line.product_id.code not in restrict_codes:
+                continue
+            selected_lines += line
+        self._create_lines_groped_by_price(cr, uid, action, order,
+                                           selected_lines, context)
         return
 
     def action_line_discount_mult_pallet(self, cr, uid, action, order,
@@ -910,12 +924,7 @@ class PromotionsRulesActions(orm.Model):
         Crea una linea descuento por cada linea que cumpla que hay un número
         de pallets, múltiplo de 1.
         """
-        line_name = action.promotion.name
-
-        obj_data = self.pool.get('ir.model.data')
-        prod_id = obj_data.get_object_reference(cr, uid, 'sale_promotions',
-                                                'product_discount')[1]
-
+        selected_lines = []
         for line in order.order_line.\
                 filtered(lambda l: not l.product_id.no_promo):
             packing = line.product_id.packaging_ids \
@@ -926,18 +935,9 @@ class PromotionsRulesActions(orm.Model):
             if not num_pallets or num_pallets % 1 != 0:
                 continue
 
-            disc = eval(action.arguments)
-            args = {
-                'order_id': order.id,
-                'name': line_name,
-                'price_unit': -(line.price_unit * disc / 100),
-                'product_uom_qty': line.product_uom_qty,
-                'promotion_line': True,
-                'product_uom': line.product_uom.id,
-                'product_id': prod_id,
-                'tax_id': [(6, 0, [x.id for x in line.tax_id])]
-            }
-            self.create_line(cr, uid, args, context)
+            selected_lines += line
+        self._create_lines_groped_by_price(cr, uid, action, order,
+                                           selected_lines, context)
         return
 
     def execute(self, cr, uid, action_id, order, context=None):
