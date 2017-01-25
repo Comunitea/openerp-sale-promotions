@@ -4,6 +4,7 @@
 
 
 from openerp.osv import orm, fields
+from openerp import api
 
 
 class SaleOrder(orm.Model):
@@ -69,6 +70,17 @@ class SaleOrder(orm.Model):
 
         return True
 
+    @api.multi
+    def copy(self, default=None):
+        """
+        No duplicar lineas de promoción.
+        """
+        self.ensure_one()
+        res = super(SaleOrder, self).copy(default)
+        promo_lines = res.order_line.filtered('promotion_line')
+        promo_lines.unlink()
+        return res
+
 
 class SaleOrderLine(orm.Model):
     '''
@@ -86,16 +98,21 @@ class SaleOrderLine(orm.Model):
         'orig_line_ids': fields.many2many('sale.order.line',
                                           'line_promo_line_rel',
                                           'line_id1',
-                                          'line_id2', 'From lines')
+                                          'line_id2', 'From lines',
+                                          copy=False)
     }
 
     def invoice_line_create(self, cr, uid, ids, context=None):
         """
-        No crear lineas de factura si son promociones, las crearemos después.
+        No crear lineas de factura si son promociones de descuento, que agrupan
+        lineas del mismo precio unitario. Facturaremos las cantidades de las
+        entregas de los albaranes parciales después.
+        Las promociones que no tienen campo orig_line_ids, o si no son
+        promociones, se facturan normalmente.
         """
         no_promo_ids = []
         for l in self.browse(cr, uid, ids):
-            if l.promotion_line:
+            if l.promotion_line and l.orig_line_ids:
                 continue
             no_promo_ids.append(l.id)
         res = super(SaleOrderLine, self).invoice_line_create(cr, uid,

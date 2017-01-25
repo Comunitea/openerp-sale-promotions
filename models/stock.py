@@ -3,53 +3,21 @@
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
 
 
-from openerp import models, api
+from openerp import models, api, exceptions, _
 
 
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
-    # def _create_invoice_line_from_vals(self, cr, uid, move, invoice_line_vals, context=None):
-    #     sl_obj = self.pool.get('sale.order.line')
-    #     il_obj = self.pool.get('account.invoice.line')
-    #     import ipdb; ipdb.set_trace()
-    #     if context.get('inv_type') in ('out_invoice') and move.procurement_id \
-    #             and move.procurement_id.sale_line_id:
-
-    #         sale_line = move.procurement_id.sale_line_id
-    #         domain = [
-    #             ('order_id', '=', move.procurement_id.sale_line_id.order_id.id),
-    #             ('promotion_line', '=', True)
-    #         ]
-    #         sale_lines = sl_obj.search(cr, uid, domain, context=context)
-    #         for promo_line in sl_obj.browse(cr, uid, sale_lines, context):
-    #             for l in promo_line.orig_line_ids:
-    #                 if l.id == sale_line.id:
-    #                     new_line_vals = invoice_line_vals.copy()
-    #                     new_line_vals.update({
-    #                         'name': promo_line.name,
-    #                         'product_id': promo_line.product_id.id,
-    #                         'quantity': move.product_uom_qty,
-    #                         'uos_id': promo_line.product_uom.id,
-    #                     })
-    #                     il_obj.create(cr, uid, new_line_vals, context)
-    #                     promo_line.write({'invoiced': True})
-
-    #     invoice_line_id = super(stock_move, self)._create_invoice_line_from_vals(cr, uid, move, invoice_line_vals, context=context)
-    #     import ipdb; ipdb.set_trace()
-    #     return invoice_line_id
-
     @api.multi
-    def action_invoice_create(self, journal_id, group=False, type='out_invoice'):
-        """ Creates invoice based on the invoice state selected for picking.
-        @param journal_id: Id of journal
-        @param group: Whether to create a group invoice or not
-        @param type: Type invoice to be created
-        @return: Ids of created invoices for the pickings
+    def action_invoice_create(self, journal_id, group=False,
+                              type='out_invoice'):
         """
-        res = super(StockPicking, self).action_invoice_create(journal_id, group=group, type=type,)
+        """
+        res = super(StockPicking, self).\
+            action_invoice_create(journal_id, group=group, type=type)
         for inv in self.env['account.invoice'].browse(res):
-            # import ipdb; ipdb.set_trace()
+            to_create_promo = {}
             for l in inv.invoice_line:
                 domain = [('invoice_lines', 'in', [l.id])]
                 sale_line = self.env['sale.order.line'].search(domain)
@@ -60,4 +28,36 @@ class StockPicking(models.Model):
                         ('orig_line_ids', 'in', [sale_line.id])
                     ]
                     promo_lines = self.env['sale.order.line'].search(domain)
+                    for pl in promo_lines:
+                        if pl not in to_create_promo:
+                            to_create_promo[pl] = []
+                        to_create_promo[pl].append(l)
+            for promo in to_create_promo:
+                qty = sum([x.quantity for x in to_create_promo[promo]])
+                account_id = promo.product_id.property_account_income.id
+                if not account_id:
+                    account_id = promo.product_id.categ_id.\
+                        property_account_income_categ.id
+                    if not account_id:
+                        raise exceptions.except_orm(
+                            _('Error!'),
+                            _('Please define income account for this \
+                              product: "%s" (id:%d).') %
+                            (promo.product_id.name, promo.product_id.id,))
+                    fpos = promo.order_id.fiscal_position or False
+                    account_id = fpos.map_account(account_id)
+                vals = {
+                    'name': promo.name,
+                    'sequence': promo.sequence,
+                    'origin': promo.order_id.name,
+                    'account_id': account_id,
+                    'price_unit': promo.price_unit,
+                    'quantity': qty,
+                    'uos_id': promo.product_uom.id,
+                    'product_id': promo.product_id.id,
+                    'invoice_line_tax_id': [(6, 0,
+                                            [x.id for x in promo.tax_id])],
+                    'invoice_id': inv.id
+                }
+                self.env['account.invoice.line'].create(vals)
         return res
