@@ -7,16 +7,20 @@
             <field name="model">res.partner</field>
             <field name="inherit_id" ref="base.view_partner_form" />
             <field name="arch" type="xml">
-                <notebook position="inside">
+<!--                 <notebook position="inside">
                     <page string="Exclusive Comercial Rules">
                         <group>
                             <field name="rule_ids" nolabel="1"/>
                         </group>
                     </page>
                 </notebook>
+ -->
+                <xpath expr="//div[@name='buttons']" position="inside">
+                    <button type="object" class="oe_stat_button" name="buttom_view_promotions" icon="fa-list">
+                        <field string="Comercial rules" name="rules_count" widget="statinfo"/>                        
+                    </button>
+                </xpath>
             </field>
         </record>
-
-
     </data>
 </openerp>

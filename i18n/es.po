@@ -6,14 +6,19 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 8.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-12-19 18:05+0000\n"
-"PO-Revision-Date: 2016-12-19 18:05+0000\n"
+"POT-Creation-Date: 2017-01-25 18:16+0000\n"
+"PO-Revision-Date: 2017-01-25 18:16+0000\n"
 "Last-Translator: <>\n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: \n"
+
+#. module: sale_promotions
+#: field:res.partner,rules_count:0
+msgid "# Customer Rules"
+msgstr "# Reglas comerciales"
 
 #. module: sale_promotions
 #: field:promos.rules.actions,action_type:0
@@ -72,7 +77,7 @@ msgid "Attribute"
 msgstr "Atributo"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:56
+#: code:addons/sale_promotions/models/rules.py:50
 #: selection:promos.rules.actions,action_type:0
 #, python-format
 msgid "Buy X get Y free"
@@ -84,9 +89,14 @@ msgid "Comercial Rules"
 msgstr "Comercial Rules"
 
 #. module: sale_promotions
+#: view:res.partner:sale_promotions.view_partner_form_promotion_rules
+msgid "Comercial rules"
+msgstr "Reglas comerciales"
+
+#. module: sale_promotions
 #: help:res.partner,rule_ids:0
 msgid "Comercial rules belongs to this                                            customer"
-msgstr "Comercial rules belongs to this                                            customer"
+msgstr "Reglas comerciales que pertenecen a este clienter"
 
 #. module: sale_promotions
 #: field:promos.rules.conditions.exps,comparator:0
@@ -144,14 +154,14 @@ msgid "Description"
 msgstr "Descripción"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:52
+#: code:addons/sale_promotions/models/rules.py:46
 #: selection:promos.rules.actions,action_type:0
 #, python-format
 msgid "Discount % on Product"
 msgstr "Descuento % en el producto"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:54
+#: code:addons/sale_promotions/models/rules.py:48
 #: selection:promos.rules.actions,action_type:0
 #, python-format
 msgid "Discount % on Sub Total"
@@ -170,9 +180,10 @@ msgid "Display Name"
 msgstr "Display Name"
 
 #. module: sale_promotions
-#: view:res.partner:sale_promotions.view_partner_form_promotion_rules
-msgid "Exclusive Comercial Rules"
-msgstr "Reglas comerciales asignadas"
+#: code:addons/sale_promotions/models/stock.py:43
+#, python-format
+msgid "Error!"
+msgstr "Error!"
 
 #. module: sale_promotions
 #: field:promos.rules.conditions.exps,serialised_expr:0
@@ -202,14 +213,14 @@ msgid "False"
 msgstr "Falso"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:53
+#: code:addons/sale_promotions/models/rules.py:47
 #: selection:promos.rules.actions,action_type:0
 #, python-format
 msgid "Fixed amount on Product"
 msgstr "Cantidad fija del producto"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:55
+#: code:addons/sale_promotions/models/rules.py:49
 #: selection:promos.rules.actions,action_type:0
 #, python-format
 msgid "Fixed amount on Sub Total"
@@ -221,11 +232,21 @@ msgid "From Date"
 msgstr "Desde"
 
 #. module: sale_promotions
+#: field:sale.order.line,orig_line_ids:0
+msgid "From lines"
+msgstr "Desde las lineas"
+
+#. module: sale_promotions
 #: field:promos.rules,id:0
 #: field:promos.rules.actions,id:0
 #: field:promos.rules.conditions.exps,id:0
 msgid "ID"
 msgstr "ID"
+
+#. module: sale_promotions
+#: help:product.product,no_promo:0
+msgid "If checked the product will be ignored                               when apply promotions"
+msgstr "Si está marcado el producto será ignorado a la hora de calcular promociones"
 
 #. module: sale_promotions
 #: help:sale.order.line,promotion_line:0
@@ -257,6 +278,32 @@ msgstr "Last Updated on"
 #: field:promos.rules,logic:0
 msgid "Logic"
 msgstr "Lógica"
+
+#. module: sale_promotions
+#: code:addons/sale_promotions/models/rules.py:53
+#: selection:promos.rules.actions,action_type:0
+#, python-format
+msgid "New line discount, multiply of pallet"
+msgstr "Nueva linea descuento unitario, si multiplo de pallet"
+
+#. module: sale_promotions
+#: code:addons/sale_promotions/models/rules.py:51
+#: selection:promos.rules.actions,action_type:0
+#, python-format
+msgid "New line discount, over order subtotal"
+msgstr "Nueva linea de descuento, sobre el subtotal"
+
+#. module: sale_promotions
+#: code:addons/sale_promotions/models/rules.py:52
+#: selection:promos.rules.actions,action_type:0
+#, python-format
+msgid "New line discount, over price unit"
+msgstr "Nueva linea de descuento, sobre el precio unitario"
+
+#. module: sale_promotions
+#: field:product.product,no_promo:0
+msgid "No Apply promotions"
+msgstr "No aplicar promociones"
 
 #. module: sale_promotions
 #: field:promos.rules,coupon_used:0
@@ -292,13 +339,29 @@ msgstr "Salida"
 #: model:ir.model,name:sale_promotions.model_res_partner
 #: field:promos.rules,partner_ids:0
 msgid "Partner"
-msgstr "Cliente"
+msgstr "Empresa"
 
 #. module: sale_promotions
 #: view:promos.rules:sale_promotions.view_promotion_rules_form
 #: field:promos.rules,partner_categories:0
 msgid "Partner Categories"
 msgstr "Categorias de clientes"
+
+#. module: sale_promotions
+#: model:ir.model,name:sale_promotions.model_stock_picking
+msgid "Picking List"
+msgstr "Albarán"
+
+#. module: sale_promotions
+#: code:addons/sale_promotions/models/stock.py:44
+#, python-format
+msgid "Please define income account for this                               product: \"%s\" (id:%d)."
+msgstr "Por favor defina la cuenta de entrada para este producto: \"%s\" (id:%d)."
+
+#. module: sale_promotions
+#: model:ir.model,name:sale_promotions.model_product_product
+msgid "Product"
+msgstr "Producto"
 
 #. module: sale_promotions
 #: field:promos.rules.actions,product_code:0
@@ -314,13 +377,6 @@ msgstr "Código producto en orden"
 #: selection:promos.rules.conditions.exps,attribute:0
 msgid "Product Discount combination"
 msgstr "Combinación descuento del producto"
-
-#. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:57
-#: selection:promos.rules.actions,action_type:0
-#, python-format
-msgid "Product Discount in new line"
-msgstr "Producto descuento en nueva línea"
 
 #. module: sale_promotions
 #: selection:promos.rules.conditions.exps,attribute:0
@@ -394,7 +450,7 @@ msgstr "Pedido de venta"
 #. module: sale_promotions
 #: model:ir.model,name:sale_promotions.model_sale_order_line
 msgid "Sales Order Line"
-msgstr "Línea de pedido de venta"
+msgstr "Línea pedido de venta"
 
 #. module: sale_promotions
 #: field:promos.rules,sequence:0
@@ -407,6 +463,11 @@ msgstr "Secuencia"
 #: selection:promos.rules.conditions.exps,attribute:0
 msgid "Ship Address City"
 msgstr "Ciudad de la direccion de entrega"
+
+#. module: sale_promotions
+#: model:ir.model,name:sale_promotions.model_stock_move
+msgid "Stock Move"
+msgstr "Movimiento de existencias"
 
 #. module: sale_promotions
 #: field:promos.rules,stop_further:0
@@ -449,7 +510,7 @@ msgid "True"
 msgstr "Verdadero"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:19
+#: code:addons/sale_promotions/models/rules.py:13
 #: selection:promos.rules.conditions.exps,attribute:0
 #, python-format
 msgid "Untaxed Total"
@@ -471,7 +532,7 @@ msgid "Value"
 msgstr "Value"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:41
+#: code:addons/sale_promotions/models/rules.py:35
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "equals"
@@ -483,49 +544,49 @@ msgid "expressions are"
 msgstr "las expresiones son"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:43
+#: code:addons/sale_promotions/models/rules.py:37
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "greater than"
 msgstr "mayor que"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:44
+#: code:addons/sale_promotions/models/rules.py:38
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "greater than or equal to"
 msgstr "mayor o igual a"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:47
+#: code:addons/sale_promotions/models/rules.py:41
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "is in"
 msgstr "es en"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:48
+#: code:addons/sale_promotions/models/rules.py:42
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "is not in"
 msgstr "no está en"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:45
+#: code:addons/sale_promotions/models/rules.py:39
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "less than"
 msgstr "menos de"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:46
+#: code:addons/sale_promotions/models/rules.py:40
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "less than or equal to"
 msgstr "menor o igual a"
 
 #. module: sale_promotions
-#: code:addons/sale_promotions/models/rules.py:42
+#: code:addons/sale_promotions/models/rules.py:36
 #: selection:promos.rules.conditions.exps,comparator:0
 #, python-format
 msgid "not equal to"

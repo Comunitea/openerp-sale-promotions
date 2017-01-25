@@ -266,11 +266,17 @@ class PromotionsRules(orm.Model):
         """
         Obtengo domain del tipo A AND (B OR C) AND (D OR F) ....
         """
+        categ_ids = []
+        if order.partner_id.category_id:
+            categ_ids = [x.id for x in order.partner_id.category_id]
         domain = ['&', '&', '&', '&',
                   ('active', '=', True),
                   '|',
                   ('partner_ids', '=', False),
                   ('partner_ids', 'in', [order.partner_id.id]),
+                  '|',
+                  ('partner_categories', '=', False),
+                  ('partner_categories', 'in', categ_ids),
                   '|',
                   ('from_date', '=', False),
                   ('from_date', '>=', order.date_order),
