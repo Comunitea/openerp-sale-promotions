@@ -45,7 +45,8 @@ class StockPicking(models.Model):
                               product: "%s" (id:%d).') %
                             (promo.product_id.name, promo.product_id.id,))
                     fpos = promo.order_id.fiscal_position or False
-                    account_id = fpos.map_account(account_id)
+                    if fpos:
+                        account_id = fpos.map_account(account_id)
                 vals = {
                     'name': promo.name,
                     'sequence': promo.sequence,
