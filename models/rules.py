@@ -933,7 +933,7 @@ class PromotionsRulesActions(orm.Model):
         for line in order.order_line.\
                 filtered(lambda l: not l.product_id.no_promo):
             packing = line.product_id.packaging_ids \
-                and line.product_id.packaging_ids or False
+                and line.product_id.packaging_ids[0] or False
             num_pallets = 0.0
             if packing and packing.ul.type == 'pallet' and packing.qty:
                 num_pallets = line.product_uom_qty / packing.qty
