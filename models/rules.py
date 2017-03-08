@@ -558,7 +558,7 @@ class PromotionsRulesConditionsExprs(orm.Model):
                 # Get number of entire pallets
                 entire_pallets = 0
                 packing = line.product_id.packaging_ids and \
-                    line.product_id.packaging_ids or False
+                    line.product_id.packaging_ids[0] or False
                 if packing and packing.ul.type == 'pallet' and packing.qty:
                     entire_pallets = line.product_uom_qty // packing.qty
 
