@@ -71,7 +71,7 @@ class ResPartner(orm.Model):
     @api.multi
     def buttom_view_promotions(self):
         self.ensure_one()
-        promo_objs = self._get_promos_domain()
+        promo_objs = self._get_customer_related_promos()
         res = {
             'domain': str([('id', 'in', [x.id for x in promo_objs])]),
             # 'view_type': 'tree',
