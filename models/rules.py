@@ -262,27 +262,31 @@ class PromotionsRules(orm.Model):
                 raise error
         return True
 
-    def _get_promotions_domain(self, order):
+    def _get_promotions_domain(self, order, partner=False, date_order=False):
         """
         Obtengo domain del tipo A AND (B OR C) AND (D OR F) ....
         """
+        if not partner:
+            partner = order.partner_id
+        if not date_order:
+            date_order = order.date_order
         categ_ids = []
-        if order.partner_id.category_id:
-            categ_ids = [x.id for x in order.partner_id.category_id]
+        if partner.category_id:
+            categ_ids = [x.id for x in partner.category_id]
         domain = ['&', '&', '&', '&',
                   ('active', '=', True),
                   '|',
                   ('partner_ids', '=', False),
-                  ('partner_ids', 'in', [order.partner_id.id]),
+                  ('partner_ids', 'in', [partner.id]),
                   '|',
                   ('partner_categories', '=', False),
                   ('partner_categories', 'in', categ_ids),
                   '|',
                   ('from_date', '=', False),
-                  ('from_date', '>=', order.date_order),
+                  ('from_date', '>=', date_order),
                   '|',
                   ('to_date', '=', False),
-                  ('to_date', '<=', order.date_order)]
+                  ('to_date', '<=', date_order)]
 
         if categ_ids:
             domain += ['|', ('partner_categories', 'in', categ_ids),
