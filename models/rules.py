@@ -283,10 +283,10 @@ class PromotionsRules(orm.Model):
                   ('partner_categories', 'in', categ_ids),
                   '|',
                   ('from_date', '=', False),
-                  ('from_date', '>=', date_order),
+                  ('from_date', '<=', date_order),
                   '|',
                   ('to_date', '=', False),
-                  ('to_date', '<=', date_order)]
+                  ('to_date', '>=', date_order)]
 
         if categ_ids:
             domain += ['|', ('partner_categories', 'in', categ_ids),
