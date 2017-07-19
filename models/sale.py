@@ -64,7 +64,7 @@ class SaleOrder(orm.Model):
                 order_line_obj.write(cursor, user, [line.id], {'product_uom_qty': line.orig_qty}, context)
             if line.old_discount:
                 order_line_obj.write(cursor, user,
-                                     order_line_ids,
+                                     [line.id],
                                      {'discount': line.old_discount,
                                       'old_discount': 0.00},
                                      context=context)
@@ -103,3 +103,4 @@ class SaleOrderLine(orm.Model):
                                      readonly=True)
 
     }
+
